@@ -1,49 +1,16 @@
 function generate_convolved_signal_GUI
-    % GUI to generate and plot a convolved biexponential signal with IRF,
-    % and provide options for first moment, monoexponential, or biexponential fitting.
+    % Main GUI to generate and analyze a convolved biexponential signal with IRF.
 
     % Create the figure
     hFig = figure('Name', 'Generate Convolved Signal', 'NumberTitle', 'off', 'Position', [100, 100, 800, 500]);
 
-    % Create UI controls for input parameters
-    uicontrol('Style', 'text', 'Position', [20, 440, 100, 20], 'String', 'Amplitude A1:');
-    hA1 = uicontrol('Style', 'edit', 'Position', [120, 440, 100, 20], 'String', '0.7');
-
-    uicontrol('Style', 'text', 'Position', [20, 410, 100, 20], 'String', 'Amplitude B1:');
-    hB1 = uicontrol('Style', 'edit', 'Position', [120, 410, 100, 20], 'String', '0.3');
-
-    uicontrol('Style', 'text', 'Position', [20, 380, 100, 20], 'String', 'Tau 1 (ns):');
-    hTau1 = uicontrol('Style', 'edit', 'Position', [120, 380, 100, 20], 'String', '1');
-
-    uicontrol('Style', 'text', 'Position', [20, 350, 100, 20], 'String', 'Tau 2 (ns):');
-    hTau2 = uicontrol('Style', 'edit', 'Position', [120, 350, 100, 20], 'String', '3');
-
-    uicontrol('Style', 'text', 'Position', [20, 320, 100, 20], 'String', 'IRF Sigma:');
-    hSigma = uicontrol('Style', 'edit', 'Position', [120, 320, 100, 20], 'String', '0.1');
-
-    uicontrol('Style', 'text', 'Position', [20, 290, 100, 20], 'String', 'Num Bins:');
-    hNumBins = uicontrol('Style', 'edit', 'Position', [120, 290, 100, 20], 'String', '1024');
-
-    uicontrol('Style', 'text', 'Position', [20, 260, 100, 20], 'String', 'Time Range:');
-    hTimeRange = uicontrol('Style', 'edit', 'Position', [120, 260, 100, 20], 'String', '[-4, 25]');
-
-    uicontrol('Style', 'text', 'Position', [20, 230, 100, 20], 'String', 'Start Shift (ns):');
-    hStartShift = uicontrol('Style', 'edit', 'Position', [120, 230, 100, 20], 'String', '12.5');
+    % Create UI controls for input parameters using a helper function
+    hParams = createInputFields(hFig);
 
     % Dropdown menu to select the type of analysis
     uicontrol('Style', 'text', 'Position', [20, 200, 100, 20], 'String', 'Fit Type:');
-    hFitType = uicontrol('Style', 'popupmenu', 'Position', [120, 200, 100, 20], ...
+    hParams.FitType = uicontrol('Style', 'popupmenu', 'Position', [120, 200, 100, 20], ...
                          'String', {'First Moment', 'Monoexponential', 'Biexponential'});
-
-    % Additional inputs for fitting parameters
-    uicontrol('Style', 'text', 'Position', [20, 170, 100, 20], 'String', 'A Fit (Monoexp):');
-    hAfit = uicontrol('Style', 'edit', 'Position', [120, 170, 100, 20], 'String', '', 'TooltipString', 'Optional fixed amplitude for monoexponential fit');
-
-    uicontrol('Style', 'text', 'Position', [20, 140, 100, 20], 'String', 'Tau 1 Fixed (Biexp):');
-    hTau1Fixed = uicontrol('Style', 'edit', 'Position', [120, 140, 100, 20], 'String', '', 'TooltipString', 'Optional fixed tau1 for biexponential fit');
-
-    uicontrol('Style', 'text', 'Position', [20, 110, 100, 20], 'String', 'Tau 2 Fixed (Biexp):');
-    hTau2Fixed = uicontrol('Style', 'edit', 'Position', [120, 110, 100, 20], 'String', '', 'TooltipString', 'Optional fixed tau2 for biexponential fit');
 
     % Button to generate and plot the signal
     uicontrol('Style', 'pushbutton', 'Position', [250, 70, 150, 40], 'String', 'Generate and Analyze', 'Callback', @generateAndAnalyze);
@@ -54,23 +21,11 @@ function generate_convolved_signal_GUI
     % Callback function for the "Generate and Analyze" button
     function generateAndAnalyze(~, ~)
         % Get user inputs
-        A1 = str2double(get(hA1, 'String'));
-        B1 = str2double(get(hB1, 'String'));
-        tau1 = str2double(get(hTau1, 'String'));
-        tau2 = str2double(get(hTau2, 'String'));
-        sigma = str2double(get(hSigma, 'String'));
-        num_bins = str2double(get(hNumBins, 'String'));
-        time_range = str2num(get(hTimeRange, 'String')); %#ok<ST2NM>
-        start_time_shift = str2double(get(hStartShift, 'String'));
-        fit_type = get(hFitType, 'Value');
-
-        % Optional parameters
-        A_fixed = str2double(get(hAfit, 'String'));
-        tau1_fixed = str2double(get(hTau1Fixed, 'String'));
-        tau2_fixed = str2double(get(hTau2Fixed, 'String'));
-
+        params = getUserInputs(hParams);
+        
         % Generate the time vector and convolved signal
-        [t, convolved_signal] = generate_convolved_signal(A1, B1, tau1, tau2, sigma, num_bins, time_range, start_time_shift);
+        [t, convolved_signal] = generate_convolved_signal(params.A1, params.B1, params.tau1, params.tau2, ...
+                                                          params.sigma, params.num_bins, params.time_range, params.start_time_shift);
 
         % Plot the generated signal
         cla(hAxes);
@@ -81,39 +36,78 @@ function generate_convolved_signal_GUI
         title(hAxes, 'Generated Signal and Fitting Analysis');
         
         % Perform the selected analysis
-        start_time = start_time_shift;
-        t_fit = t(t >= start_time); % Time vector starting from the fit start time
-        
-        switch fit_type
-            case 1 % First Moment
-                M = calculate_first_moment(t, convolved_signal, start_time);
-                legend(hAxes, 'Convolved Signal');
-                fprintf('First Moment (Average Time) of Decay Signal from %.2f ns: %.4f ns\n', start_time, M);
-                text(0.6, 0.8, sprintf('First Moment: %.4f ns', M), 'Units', 'normalized', 'Parent', hAxes);
-
-            case 2 % Monoexponential Fit
-                if isnan(A_fixed)
-                    [A_fit, tau_fit] = fit_monoexponential(t, convolved_signal, start_time);
-                else
-                    [A_fit, tau_fit] = fit_monoexponential(t, convolved_signal, start_time, A_fixed);
-                end
-                monoexp_fit = A_fit * exp(-(t_fit - start_time) / tau_fit); % Monoexponential fit curve
-                plot(hAxes, t_fit, monoexp_fit, 'r--', 'DisplayName', 'Monoexponential Fit');
-                legend(hAxes, 'Convolved Signal', 'Monoexponential Fit');
-                fprintf('Monoexponential Fit Parameters:\nA = %.4f\nTau = %.4f ns\n', A_fit, tau_fit);
-
-            case 3 % Biexponential Fit
-                if isnan(tau1_fixed), tau1_fixed = []; end
-                if isnan(tau2_fixed), tau2_fixed = []; end
-                [A_fit, B_fit, tau1_fit, tau2_fit] = fit_biexponential(t, convolved_signal, start_time, tau1_fixed, tau2_fixed);
-                biexp_fit = A_fit * exp(-(t_fit - start_time) / tau1_fit) + B_fit * exp(-(t_fit - start_time) / tau2_fit); % Biexponential fit curve
-                plot(hAxes, t_fit, biexp_fit, 'g--', 'DisplayName', 'Biexponential Fit');
-                legend(hAxes, 'Convolved Signal', 'Biexponential Fit');
-                fprintf('Biexponential Fit Parameters:\nA = %.4f\nB = %.4f\nTau1 = %.4f ns\nTau2 = %.4f ns\n', A_fit, B_fit, tau1_fit, tau2_fit);
-        end
+        performAnalysis(hAxes, t, convolved_signal, params); 
         hold(hAxes, 'off');
     end
 end
 
-% Ensure `generate_convolved_signal`, `calculate_first_moment`, `fit_monoexponential`, and `fit_biexponential`
-% functions are accessible in the same file or as separate function files in the MATLAB path.
+% --- Helper Function to Create Input Fields ---
+function hParams = createInputFields(hFig)
+    % Creates and returns UI controls for input parameters.
+    hParams.A1 = uicontrol(hFig, 'Style', 'edit', 'Position', [120, 440, 100, 20], 'String', '0.7', 'TooltipString', 'Amplitude A1');
+    hParams.B1 = uicontrol(hFig, 'Style', 'edit', 'Position', [120, 410, 100, 20], 'String', '0.3', 'TooltipString', 'Amplitude B1');
+    hParams.tau1 = uicontrol(hFig, 'Style', 'edit', 'Position', [120, 380, 100, 20], 'String', '1', 'TooltipString', 'Tau 1 (ns)');
+    hParams.tau2 = uicontrol(hFig, 'Style', 'edit', 'Position', [120, 350, 100, 20], 'String', '3', 'TooltipString', 'Tau 2 (ns)');
+    hParams.sigma = uicontrol(hFig, 'Style', 'edit', 'Position', [120, 320, 100, 20], 'String', '0.1', 'TooltipString', 'IRF Sigma');
+    hParams.num_bins = uicontrol(hFig, 'Style', 'edit', 'Position', [120, 290, 100, 20], 'String', '1024', 'TooltipString', 'Num Bins');
+    hParams.time_range = uicontrol(hFig, 'Style', 'edit', 'Position', [120, 260, 100, 20], 'String', '[-4, 25]', 'TooltipString', 'Time Range');
+    hParams.start_time_shift = uicontrol(hFig, 'Style', 'edit', 'Position', [120, 230, 100, 20], 'String', '12.5', 'TooltipString', 'Start Shift (ns)');
+    
+    % Additional inputs for fitting parameters
+    hParams.Afit = uicontrol(hFig, 'Style', 'edit', 'Position', [120, 170, 100, 20], 'String', '', 'TooltipString', 'Optional fixed amplitude for monoexponential fit');
+    hParams.Tau1Fixed = uicontrol(hFig, 'Style', 'edit', 'Position', [120, 140, 100, 20], 'String', '', 'TooltipString', 'Optional fixed tau1 for biexponential fit');
+    hParams.Tau2Fixed = uicontrol(hFig, 'Style', 'edit', 'Position', [120, 110, 100, 20], 'String', '', 'TooltipString', 'Optional fixed tau2 for biexponential fit');
+end
+
+% --- Helper Function to Retrieve Input Values from Fields ---
+function params = getUserInputs(hParams)
+    % Retrieves values from input fields and returns them as a structure.
+    params.A1 = str2double(get(hParams.A1, 'String'));
+    params.B1 = str2double(get(hParams.B1, 'String'));
+    params.tau1 = str2double(get(hParams.tau1, 'String'));
+    params.tau2 = str2double(get(hParams.tau2, 'String'));
+    params.sigma = str2double(get(hParams.sigma, 'String'));
+    params.num_bins = str2double(get(hParams.num_bins, 'String'));
+    params.time_range = str2num(get(hParams.time_range, 'String')); %#ok<ST2NM>
+    params.start_time_shift = str2double(get(hParams.start_time_shift, 'String'));
+    params.FitType = get(hParams.FitType, 'Value');
+    params.A_fixed = str2double(get(hParams.Afit, 'String'));
+    params.tau1_fixed = str2double(get(hParams.Tau1Fixed, 'String'));
+    params.tau2_fixed = str2double(get(hParams.Tau2Fixed, 'String'));
+end
+
+% --- Helper Function to Perform Analysis and Plot Results ---
+function performAnalysis(hAxes, t, convolved_signal, params)
+    % Performs the selected analysis type and plots the results.
+
+    start_time = params.start_time_shift;
+    t_fit = t(t >= start_time);
+
+    switch params.FitType
+        case 1 % First Moment
+            M = calculate_first_moment(t, convolved_signal, start_time);
+            legend(hAxes, 'Convolved Signal');
+            fprintf('First Moment (Average Time) of Decay Signal from %.2f ns: %.4f ns\n', start_time, M);
+            text(0.6, 0.8, sprintf('First Moment: %.4f ns', M), 'Units', 'normalized', 'Parent', hAxes);
+
+        case 2 % Monoexponential Fit
+            if isnan(params.A_fixed)
+                [A_fit, tau_fit] = fit_monoexponential(t, convolved_signal, start_time);
+            else
+                [A_fit, tau_fit] = fit_monoexponential(t, convolved_signal, start_time, params.A_fixed);
+            end
+            monoexp_fit = A_fit * exp(-(t_fit - start_time) / tau_fit);
+            plot(hAxes, t_fit, monoexp_fit, 'r--', 'DisplayName', 'Monoexponential Fit');
+            legend(hAxes, 'Convolved Signal', 'Monoexponential Fit');
+            fprintf('Monoexponential Fit Parameters:\nA = %.4f\nTau = %.4f ns\n', A_fit, tau_fit);
+
+        case 3 % Biexponential Fit
+            if isnan(params.tau1_fixed), tau1_fixed = []; else, tau1_fixed = params.tau1_fixed; end
+            if isnan(params.tau2_fixed), tau2_fixed = []; else, tau2_fixed = params.tau2_fixed; end
+            [A_fit, B_fit, tau1_fit, tau2_fit] = fit_biexponential(t, convolved_signal, start_time, tau1_fixed, tau2_fixed);
+            biexp_fit = A_fit * exp(-(t_fit - start_time) / tau1_fit) + B_fit * exp(-(t_fit - start_time) / tau2_fit);
+            plot(hAxes, t_fit, biexp_fit, 'g--', 'DisplayName', 'Biexponential Fit');
+            legend(hAxes, 'Convolved Signal', 'Biexponential Fit');
+            fprintf('Biexponential Fit Parameters:\nA = %.4f\nB = %.4f\nTau1 = %.4f ns\nTau2 = %.4f ns\n', A_fit, B_fit, tau1_fit, tau2_fit);
+    end
+end
