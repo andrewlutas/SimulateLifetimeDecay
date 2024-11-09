@@ -12,6 +12,11 @@ function generate_convolved_signal_GUI
     hParams.FitType = uicontrol('Style', 'popupmenu', 'Position', [120, 200, 100, 20], ...
                          'String', {'First Moment', 'Monoexponential', 'Biexponential'});
 
+    % Radio button for toggling log scale on the y-axis
+    uicontrol('Style', 'text', 'Position', [20, 80, 100, 20], 'String', 'Log Y-Axis:');
+    hParams.LogScale = uicontrol('Style', 'radiobutton', 'Position', [120, 80, 20, 20], ...
+                                 'TooltipString', 'Toggle logarithmic scaling on the y-axis');
+
     % Button to generate and plot the signal
     uicontrol('Style', 'pushbutton', 'Position', [250, 70, 150, 40], 'String', 'Generate and Analyze', 'Callback', @generateAndAnalyze);
 
@@ -22,10 +27,16 @@ function generate_convolved_signal_GUI
     function generateAndAnalyze(~, ~)
         % Get user inputs
         params = getUserInputs(hParams);
-        
+
         % Generate the time vector and convolved signal
         [t, convolved_signal] = generate_convolved_signal(params.A1, params.B1, params.tau1, params.tau2, ...
-                                                          params.sigma, params.num_bins, params.time_range, params.start_time_shift);
+            params.sigma, params.num_bins, params.time_range, params.start_time_shift);
+
+        % Check if log scale is selected and add a small offset if true
+        if get(hParams.LogScale, 'Value') == 1
+            y_offset = 1e-3; % Small positive offset to avoid log(0)
+            convolved_signal = convolved_signal + y_offset;
+        end
 
         % Plot the generated signal
         cla(hAxes);
@@ -34,29 +45,52 @@ function generate_convolved_signal_GUI
         xlabel(hAxes, 'Time (ns)');
         ylabel(hAxes, 'Amplitude');
         title(hAxes, 'Generated Signal and Fitting Analysis');
-        
+
+        % Apply logarithmic y-axis if selected
+        if get(hParams.LogScale, 'Value') == 1
+            set(hAxes, 'YScale', 'log');
+        else
+            set(hAxes, 'YScale', 'linear');
+        end
+
         % Perform the selected analysis
-        performAnalysis(hAxes, t, convolved_signal, params); 
+        performAnalysis(hAxes, t, convolved_signal, params);
         hold(hAxes, 'off');
     end
+
 end
 
-% --- Helper Function to Create Input Fields ---
+% --- Helper Function to Create Input Fields with Labels ---
 function hParams = createInputFields(hFig)
-    % Creates and returns UI controls for input parameters.
-    hParams.A1 = uicontrol(hFig, 'Style', 'edit', 'Position', [120, 440, 100, 20], 'String', '0.7', 'TooltipString', 'Amplitude A1');
-    hParams.B1 = uicontrol(hFig, 'Style', 'edit', 'Position', [120, 410, 100, 20], 'String', '0.3', 'TooltipString', 'Amplitude B1');
-    hParams.tau1 = uicontrol(hFig, 'Style', 'edit', 'Position', [120, 380, 100, 20], 'String', '1', 'TooltipString', 'Tau 1 (ns)');
-    hParams.tau2 = uicontrol(hFig, 'Style', 'edit', 'Position', [120, 350, 100, 20], 'String', '3', 'TooltipString', 'Tau 2 (ns)');
-    hParams.sigma = uicontrol(hFig, 'Style', 'edit', 'Position', [120, 320, 100, 20], 'String', '0.1', 'TooltipString', 'IRF Sigma');
-    hParams.num_bins = uicontrol(hFig, 'Style', 'edit', 'Position', [120, 290, 100, 20], 'String', '1024', 'TooltipString', 'Num Bins');
-    hParams.time_range = uicontrol(hFig, 'Style', 'edit', 'Position', [120, 260, 100, 20], 'String', '[-4, 25]', 'TooltipString', 'Time Range');
-    hParams.start_time_shift = uicontrol(hFig, 'Style', 'edit', 'Position', [120, 230, 100, 20], 'String', '12.5', 'TooltipString', 'Start Shift (ns)');
-    
-    % Additional inputs for fitting parameters
-    hParams.Afit = uicontrol(hFig, 'Style', 'edit', 'Position', [120, 170, 100, 20], 'String', '', 'TooltipString', 'Optional fixed amplitude for monoexponential fit');
-    hParams.Tau1Fixed = uicontrol(hFig, 'Style', 'edit', 'Position', [120, 140, 100, 20], 'String', '', 'TooltipString', 'Optional fixed tau1 for biexponential fit');
-    hParams.Tau2Fixed = uicontrol(hFig, 'Style', 'edit', 'Position', [120, 110, 100, 20], 'String', '', 'TooltipString', 'Optional fixed tau2 for biexponential fit');
+    % Creates UI controls with labels for input parameters and returns the handles.
+
+    % Define labels and positions
+    labels = {'Amplitude A1:', 'Amplitude B1:', 'Tau 1 (ns):', 'Tau 2 (ns):', ...
+              'IRF Sigma:', 'Num Bins:', 'Time Range:', 'Start Shift (ns):', ...
+              'A Fit (Monoexp):', 'Tau 1 Fixed (Biexp):', 'Tau 2 Fixed (Biexp):'};
+    positions = [20, 440; 20, 410; 20, 380; 20, 350; 20, 320; 20, 290; 20, 260; ...
+                 20, 230; 20, 170; 20, 140; 20, 110];
+
+    % Create labels and corresponding input fields
+    hParams = struct();
+    fields = {'A1', 'B1', 'tau1', 'tau2', 'sigma', 'num_bins', 'time_range', ...
+              'start_time_shift', 'Afit', 'Tau1Fixed', 'Tau2Fixed'};
+    defaultValues = {'0.2', '0.8', '.7', '2.1', '0.1', '1024', '[-4, 25]', '12.5', '', '', ''};
+    tooltips = {'Amplitude A1', 'Amplitude B1', 'Decay constant Tau 1', 'Decay constant Tau 2', ...
+                'Standard deviation of IRF', 'Number of bins in the time vector', ...
+                'Time range as [t_min, t_max]', 'Start time shift for second decay', ...
+                'Fixed amplitude for monoexponential fit', ...
+                'Fixed tau1 for biexponential fit', 'Fixed tau2 for biexponential fit'};
+
+    for i = 1:length(fields)
+        % Create label
+        uicontrol(hFig, 'Style', 'text', 'Position', [positions(i, 1), positions(i, 2), 100, 20], ...
+                  'String', labels{i}, 'HorizontalAlignment', 'left');
+
+        % Create input field
+        hParams.(fields{i}) = uicontrol(hFig, 'Style', 'edit', 'Position', [positions(i, 1) + 100, positions(i, 2), 100, 20], ...
+                                        'String', defaultValues{i}, 'TooltipString', tooltips{i});
+    end
 end
 
 % --- Helper Function to Retrieve Input Values from Fields ---
